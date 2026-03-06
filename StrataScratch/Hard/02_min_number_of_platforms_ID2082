@@ -1,0 +1,29 @@
+from pyspark.sql import functions as F
+from pyspark.sql.window import Window
+
+# arrival events (+1)
+arrivals = train_arrivals.select(
+    F.col("arrival_time").alias("time"),
+    F.lit(1).alias("change")
+)
+
+# departure events (-1)
+departures = train_departures.select(
+    F.col("departure_time").alias("time"),
+    F.lit(-1).alias("change")
+)
+
+# combine events
+events = arrivals.union(departures)
+
+# sort events
+events = events.orderBy(F.col("time"), F.col("change").desc())
+
+# window for cumulative sum
+w = Window.orderBy("time","change").rowsBetween(Window.unboundedPreceding, Window.currentRow)
+
+# running platforms
+events = events.withColumn("platforms", F.sum("change").over(w))
+
+# result
+result = events.select(F.max("platforms")).first()[0]
